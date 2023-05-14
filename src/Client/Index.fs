@@ -189,7 +189,7 @@ module Components =
             prop.children [
                 Bulma.input.text [
                     prop.value model.Description.Description
-                    prop.placeholder "What needs to be done?"
+                    prop.placeholder "What to do?"
                     prop.onChange (fun x -> SetDescriptionInput x |> dispatch)
                 ]
                 model |> validateDescription |> validationMessage
