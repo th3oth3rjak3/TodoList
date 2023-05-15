@@ -19,6 +19,8 @@ type Msg =
     | SetDueDateInput of DateTime
     | AddTodo
     | AddedTodo of TodoItem
+    | DeleteTodo of Guid
+    | DeletedTodo of Guid
 
 type ValidationResult =
     | Valid of string
@@ -59,6 +61,10 @@ let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                   Touched = false } },
         cmd
     | AddedTodo todo -> { model with Todos = model.Todos @ [ todo ] |> Todo.sort }, Cmd.none
+    | DeletedTodo id -> { model with Todos = model.Todos |> List.filter (fun todo -> todo.Id <> id) }, Cmd.none
+    | DeleteTodo id ->
+        let cmd = Cmd.OfAsync.perform todosApi.deleteTodo id DeletedTodo
+        { model with Todos = model.Todos |> List.filter (fun todo -> todo.Id <> id) }, cmd
 
 open Feliz
 open Feliz.Bulma
@@ -119,7 +125,7 @@ module Components =
                 Bulma.button.a [
                     button.isSmall
                     color.isDanger
-                    prop.onClick (fun _ -> ())
+                    prop.onClick (fun _ -> DeleteTodo id |> dispatch)
                     prop.text "Delete"
                 ]
             ]

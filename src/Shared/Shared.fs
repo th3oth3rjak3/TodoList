@@ -39,4 +39,5 @@ module Route =
 
 type ITodosApi =
     { getTodos: unit -> Async<TodoItem list>
-      addTodo: TodoItem -> Async<TodoItem> }
+      addTodo: TodoItem -> Async<TodoItem>
+      deleteTodo: Guid -> Async<Guid>}

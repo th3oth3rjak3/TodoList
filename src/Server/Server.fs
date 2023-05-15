@@ -5,9 +5,10 @@ open Fable.Remoting.Giraffe
 open Saturn
 
 open Shared
+open System
 
 module Storage =
-    let todos = ResizeArray()
+    let todos = ResizeArray<TodoItem>()
 
     let addTodo (todo: TodoItem) =
         let { Description = description
@@ -32,9 +33,24 @@ module ApiFunctions =
     let getTodos () =
         async { return Storage.todos |> List.ofSeq }
 
+    let deleteTodo (id: Guid) =
+        async {
+            let foundTodo =
+                Storage.todos
+                |> Seq.tryFind (fun todo -> todo.Id = id)
+
+            return
+                match foundTodo with
+                | None -> id
+                | Some todo ->
+                    Storage.todos.Remove todo |> ignore
+                    id
+        }
+
 let todosApi =
     { getTodos = ApiFunctions.getTodos
-      addTodo = ApiFunctions.addTodo }
+      addTodo = ApiFunctions.addTodo
+      deleteTodo = ApiFunctions.deleteTodo }
 
 let webApp =
     Remoting.createApi ()
