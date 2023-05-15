@@ -7,15 +7,18 @@ open Saturn
 open Shared
 open System
 
+module Mappings =
+    let toValidateModel (todo: TodoItem) =
+        todo.Description, todo.DueDate
+
 module Storage =
     let todos = ResizeArray<TodoItem>()
 
     let addTodo (todo: TodoItem) =
-        let { Description = description
-              DueDate = dueDate } =
-            todo
-
-        match Todo.isValid description dueDate with
+        todo
+        |> Mappings.toValidateModel
+        |> Todo.isValid
+        |> function
         | true ->
             todos.Add todo
             Ok()
@@ -26,8 +29,8 @@ module ApiFunctions =
         async {
             return
                 match Storage.addTodo todo with
-                | Ok () -> todo
-                | Error e -> failwith e
+                | Ok () -> Some todo
+                | Error _ -> None
         }
 
     let getTodos () =
@@ -35,12 +38,10 @@ module ApiFunctions =
 
     let deleteTodo (id: Guid) =
         async {
-            let foundTodo =
+            return
                 Storage.todos
                 |> Seq.tryFind (fun todo -> todo.Id = id)
-
-            return
-                match foundTodo with
+                |> function
                 | None -> id
                 | Some todo ->
                     Storage.todos.Remove todo |> ignore

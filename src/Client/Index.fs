@@ -18,7 +18,7 @@ type Msg =
     | SetDescriptionInput of string
     | SetDueDateInput of DateTime
     | AddTodo
-    | AddedTodo of TodoItem
+    | TriedAddTodo of TodoItem option
     | DeleteTodo of Guid
     | DeletedTodo of Guid
 
@@ -32,39 +32,90 @@ let todosApi =
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<ITodosApi>
 
+
+let createDefaultDescription () : DescriptionInput = { Description = ""; Touched = false }
+
+let createDefaultDueDate () : DueDateInput =
+    { DueDate = DateTime.Today
+      Touched = false }
+
+let createDefaultModel () : Model =
+    { Todos = []
+      Description = createDefaultDescription ()
+      DueDate = createDefaultDueDate () }
+
 let init () : Model * Cmd<Msg> =
-    let model =
-        { Todos = []
-          Description = { Description = ""; Touched = false }
-          DueDate =
-            { DueDate = DateTime.Today
-              Touched = false } }
+    createDefaultModel (), Cmd.OfAsync.perform todosApi.getTodos () GotTodos
 
-    let cmd = Cmd.OfAsync.perform todosApi.getTodos () GotTodos
+module Mappings =
+    let fromModelToTodo (model: Model) : TodoItem =
+        Todo.create model.Description.Description model.DueDate.DueDate
 
-    model, cmd
+    let toValidateModel (model: Model) =
+        model.Description.Description, model.DueDate.DueDate
+
+    let todosToModel (model: Model) (todos: TodoItem list) : Model = { model with Todos = todos }
+
+    let resetModelWithTodos (model: Model) : Model =
+        { model with
+            Description = createDefaultDescription ()
+            DueDate = createDefaultDueDate () }
+
+module UpdateCommands =
+    let updateGotTodos (todos: TodoItem list) (model: Model) =
+        todos
+        |> Todo.sort
+        |> fun sortedTodos -> { model with Todos = sortedTodos }, Cmd.none
+
+    let updateDescriptionInput (value: string) (model: Model) =
+        { model with Description = { Description = value; Touched = true } }, Cmd.none
+
+    let updateDueDateInput (value: DateTime) (model: Model) =
+        { model with DueDate = { DueDate = value; Touched = true } }, Cmd.none
+
+    let performTodoApiCmd (todo: TodoItem) =
+        Cmd.OfAsync.perform todosApi.addTodo todo TriedAddTodo
+
+    let addNewTodo (model: Model) =
+        model
+        |> Mappings.fromModelToTodo
+        |> performTodoApiCmd
+        |> fun cmd -> model, cmd
+
+    let addedNewTodo (todo: TodoItem) (model: Model) =
+        model.Todos @ [ todo ]
+        |> Todo.sort
+        |> Mappings.todosToModel model
+        |> Mappings.resetModelWithTodos,
+        Cmd.none
+
+    let triedAddNewTodo (todo: TodoItem option) (model: Model) =
+        match todo with
+        | Some todo -> addedNewTodo todo model
+        | None -> model, Cmd.none
+
+    let deletedTodo (model: Model) (id: Guid) =
+        model.Todos
+        |> List.filter (fun todo -> todo.Id <> id)
+        |> Mappings.todosToModel model,
+        Cmd.none
+
+    let performDeleteTodoCmd (id: Guid) =
+        Cmd.OfAsync.perform todosApi.deleteTodo id DeletedTodo
+
+    let deleteTodo (id: Guid) (model: Model) = model, performDeleteTodoCmd id
+
 
 let update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     match msg with
-    | GotTodos todos -> { model with Todos = todos |> Todo.sort }, Cmd.none
-    | SetDescriptionInput value -> { model with Description = { Description = value; Touched = true } }, Cmd.none
-    | SetDueDateInput value -> { model with DueDate = { DueDate = value; Touched = true } }, Cmd.none
-    | AddTodo ->
-        let todo = Todo.create model.Description.Description model.DueDate.DueDate
+    | GotTodos todos -> UpdateCommands.updateGotTodos todos model
+    | SetDescriptionInput value -> UpdateCommands.updateDescriptionInput value model
+    | SetDueDateInput value -> UpdateCommands.updateDueDateInput value model
+    | TriedAddTodo optionTodo -> UpdateCommands.triedAddNewTodo optionTodo model
+    | AddTodo -> UpdateCommands.addNewTodo model
+    | DeletedTodo id -> UpdateCommands.deletedTodo model id
+    | DeleteTodo id -> UpdateCommands.deleteTodo id model
 
-        let cmd = Cmd.OfAsync.perform todosApi.addTodo todo AddedTodo
-
-        { model with
-            Description = { Description = ""; Touched = false }
-            DueDate =
-                { DueDate = DateTime.Today
-                  Touched = false } },
-        cmd
-    | AddedTodo todo -> { model with Todos = model.Todos @ [ todo ] |> Todo.sort }, Cmd.none
-    | DeletedTodo id -> { model with Todos = model.Todos |> List.filter (fun todo -> todo.Id <> id) }, Cmd.none
-    | DeleteTodo id ->
-        let cmd = Cmd.OfAsync.perform todosApi.deleteTodo id DeletedTodo
-        { model with Todos = model.Todos |> List.filter (fun todo -> todo.Id <> id) }, cmd
 
 open Feliz
 open Feliz.Bulma
@@ -75,12 +126,17 @@ module Formatters =
 
 
 module Handlers =
-    let addTodoWhenValid (model: Model) (dispatch: Msg -> unit) =
-        let isValid = Todo.isValid model.Description.Description model.DueDate.DueDate
 
-        match isValid with
+    let handleAddTodoDispatch (dispatch: Msg -> unit) =
+        function
         | true -> AddTodo |> dispatch
         | false -> ()
+
+    let addTodoIfValid (model: Model) (dispatch: Msg -> unit) =
+        model
+        |> Mappings.toValidateModel
+        |> Todo.isValid
+        |> handleAddTodoDispatch dispatch
 
 module Validation =
     let dueDateTouched (model: Model) = model.DueDate.Touched
@@ -218,10 +274,12 @@ module Components =
             Bulma.button.a [
                 color.isPrimary
                 prop.disabled (
-                    Todo.isValid model.Description.Description model.DueDate.DueDate
+                    model
+                    |> Mappings.toValidateModel
+                    |> Todo.isValid
                     |> not
                 )
-                prop.onClick (fun _ -> Handlers.addTodoWhenValid model dispatch)
+                prop.onClick (fun _ -> Handlers.addTodoIfValid model dispatch)
                 prop.text "Add"
             ]
         ]
