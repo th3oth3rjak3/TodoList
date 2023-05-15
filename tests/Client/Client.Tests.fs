@@ -13,17 +13,23 @@ module Commands =
         <| fun () ->
             let newTodo = Todo.create "new todo" DateTime.Today
             let model, _ = init ()
-            let model, _ = update (AddedTodo newTodo) model
+            let model, _ = update (TriedAddTodo(Some newTodo)) model
             Expect.equal model.Todos.Length 1 "There should be 1 todo"
             Expect.equal model.Todos.[0] newTodo "Todo should equal new todo"
 
-    let addTodoWithExistingModel () =
-        testCase "AddTodo should reset the model."
+    let triedAddWithExistingModel () =
+        testCase "TriedAddTodo should reset the model."
         <| fun () ->
             let model, _ = init ()
             let model, _ = update (SetDescriptionInput "new todo") model
             let model, _ = update (SetDueDateInput DateTime.Today) model
-            let model, _ = update AddTodo model
+
+            let model, _ =
+                Todo.create "new todo" DateTime.Today
+                |> Some
+                |> TriedAddTodo
+                |> fun msg -> update msg model
+
             Expect.equal model.Description.Description "" "Description should be empty"
             Expect.equal model.DueDate.DueDate DateTime.Today "DueDate should be today"
             Expect.equal model.Description.Touched false "Description should not be touched"
@@ -132,7 +138,7 @@ let clientCommands =
     testList
         "Client"
         [ Commands.addTodo ()
-          Commands.addTodoWithExistingModel ()
+          Commands.triedAddWithExistingModel ()
           Commands.gotTodos () ]
 
 let clientFunctions = testList "Client.Components" [ Components.dueDateTouched () ]

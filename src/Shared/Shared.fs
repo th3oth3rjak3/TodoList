@@ -19,7 +19,7 @@ module Todo =
 
     let dueDateValid (dueDate: DateTime) = dueDate |> DateTimes.todayOrLater
 
-    let isValid (description: string) (dueDate: DateTime) =
+    let isValid ((description: string), (dueDate: DateTime)) =
         descriptionValid description
         && dueDateValid dueDate
 
@@ -39,4 +39,5 @@ module Route =
 
 type ITodosApi =
     { getTodos: unit -> Async<TodoItem list>
-      addTodo: TodoItem -> Async<TodoItem> }
+      addTodo: TodoItem -> Async<TodoItem option>
+      deleteTodo: Guid -> Async<Guid>}
