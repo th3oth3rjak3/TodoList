@@ -9,16 +9,16 @@ type DescriptionInput = { Description: string; Touched: bool }
 type DueDateInput = { DueDate: DateTime; Touched: bool }
 
 type Model =
-    { Todos: Todo list
+    { Todos: TodoItem list
       Description: DescriptionInput
       DueDate: DueDateInput }
 
 type Msg =
-    | GotTodos of Todo list
+    | GotTodos of TodoItem list
     | SetDescriptionInput of string
     | SetDueDateInput of DateTime
     | AddTodo
-    | AddedTodo of Todo
+    | AddedTodo of TodoItem
 
 type ValidationResult =
     | Valid of string
@@ -64,7 +64,7 @@ open Feliz
 open Feliz.Bulma
 
 module Formatters =
-    let formattedTodo (todo: Todo) =
+    let formattedTodo (todo: TodoItem) =
         sprintf "%s - due: %s" todo.Description (Todo.shortDate todo)
 
 
@@ -74,9 +74,17 @@ module Handlers =
 
         match isValid with
         | true -> AddTodo |> dispatch
-        | false ->
+        | false -> ()
 
-            ()
+module Validation =
+    let dueDateTouched (model: Model) = model.DueDate.Touched
+
+    let dueDateValid (model: Model) = Todo.dueDateValid model.DueDate.DueDate
+
+    let descriptionTouched (model: Model) = model.Description.Touched
+
+    let descriptionValid (model: Model) =
+        Todo.descriptionValid model.Description.Description
 
 
 module Components =
@@ -94,7 +102,7 @@ module Components =
             ]
         ]
 
-    let todoContent (todo: Todo) =
+    let todoContent (todo: TodoItem) =
         Bulma.column [
             prop.children [
                 Bulma.field.p [
@@ -117,7 +125,7 @@ module Components =
             ]
         ]
 
-    let todoRow (todo: Todo) (dispatch: Msg -> unit) =
+    let todoRow (todo: TodoItem) (dispatch: Msg -> unit) =
         Bulma.columns [
             columns.isVCentered
             prop.children [
@@ -145,15 +153,6 @@ module Components =
             ]
 
 
-    let dueDateTouched (model: Model) = model.DueDate.Touched
-
-    let dueDateValid (model: Model) = Todo.dueDateValid model.DueDate.DueDate
-
-    let descriptionTouched (model: Model) = model.Description.Touched
-
-    let descriptionValid (model: Model) =
-        Todo.descriptionValid model.Description.Description
-
     let getValidationResult (validMessage: string, invalidMessage: string) =
         function
         | true -> Valid validMessage
@@ -161,24 +160,24 @@ module Components =
 
     let validateTouchedDueDate (model: Model) =
         model
-        |> dueDateValid
+        |> Validation.dueDateValid
         |> getValidationResult ("Due Date is valid", "Due Date must be today or later")
 
     let validateTouchedDescription (model: Model) =
         model
-        |> descriptionValid
+        |> Validation.descriptionValid
         |> getValidationResult ("Description is valid", "Description is required")
 
     let validateDueDate (model: Model) : ValidationResult =
         model
-        |> dueDateTouched
+        |> Validation.dueDateTouched
         |> function
             | true -> validateTouchedDueDate model
             | false -> NotTouched
 
     let validateDescription (model: Model) : ValidationResult =
         model
-        |> descriptionTouched
+        |> Validation.descriptionTouched
         |> function
             | true -> validateTouchedDescription model
             | false -> NotTouched

@@ -2,7 +2,7 @@ namespace Shared
 
 open System
 
-type Todo =
+type TodoItem =
     { Id: Guid
       Description: string
       DueDate: DateTime }
@@ -28,14 +28,15 @@ module Todo =
           Description = description
           DueDate = dueDate }
 
-    let shortDate (todo: Todo) = todo.DueDate.ToShortDateString()
+    let shortDate (todo: TodoItem) = todo.DueDate.ToString("MM/dd/yyyy")
 
-    let sort (todos: Todo list) = List.sortBy (fun todo -> todo.DueDate) todos
+    let sort (todos: TodoItem list) =
+        List.sortBy (fun todo -> todo.DueDate) todos
 
 module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
 type ITodosApi =
-    { getTodos: unit -> Async<Todo list>
-      addTodo: Todo -> Async<Todo> }
+    { getTodos: unit -> Async<TodoItem list>
+      addTodo: TodoItem -> Async<TodoItem> }

@@ -9,7 +9,7 @@ open Shared
 module Storage =
     let todos = ResizeArray()
 
-    let addTodo (todo: Todo) =
+    let addTodo (todo: TodoItem) =
         let { Description = description
               DueDate = dueDate } =
             todo
@@ -21,7 +21,7 @@ module Storage =
         | false -> Error "Invalid todo"
 
 module ApiFunctions =
-    let addTodo (todo: Todo) =
+    let addTodo (todo: TodoItem) =
         async {
             return
                 match Storage.addTodo todo with
